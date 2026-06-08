@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oregon Fire Casualties</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #2a1f1a;
+    --surface: #372920;
+    --surface2: #43342a;
+    --border: #5c4638;
+    --text: #e8e0d0;
+    --muted: #a89880;
+    --accent: #c5894a;
+    --orange: #b87040;
+    --yellow: #9f9a60;
+    --green: #aeb886;
+    --blue: #7a9e8a;
+    --purple: #876c41;
+    --red: #8b2a20;
+    --severity-minor: #7a9e8a;
+    --severity-moderate: #9f9a60;
+    --severity-severe: #b87040;
+    --severity-life: #8b3a20;
+    --severity-fatality: #541714;
+    --severity-undetermined: #6b5a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    gap: 20px;
+  }
+  .header-left { display: flex; align-items: baseline; gap: 14px; }
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .header-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header-stats {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+  .hstat {
+    text-align: center;
+  }
+  .hstat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .hstat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .header-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .filter-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 4px;
+  }
+  .filter-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 220px 1fr 280px;
+    grid-template-rows: 1fr 300px;
+    gap: 1px;
+    background: var(--border);
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .panel {
+    background: var(--surface);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* SIDEBAR LEFT */
+  .sidebar-left {
+    grid-row: 1 / 2;
+    grid-column: 1 / 2;
+  }
+
+  .selected-info {
+    padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .sel-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 10px;
+  }
+
+  .sel-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sel-stat-key {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sel-stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    color: var(--accent);
+  }
+
+  .sev-bar-wrap { margin-top: 12px; }
+  .sev-bar-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .sev-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .sev-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    width: 80px;
+    flex-shrink: 0;
+  }
+  .sev-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .sev-bar-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+  .sev-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    width: 22px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .placeholder-text {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 8px 0;
+  }
+
+  /* MAP */
+  .map-panel {
+    grid-row: 1 / 2;
+    grid-column: 2 / 3;
+  }
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* SIDEBAR RIGHT */
+  .sidebar-right {
+    grid-row: 1 / 2;
+    grid-column: 3 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+  }
+  .sidebar-right .panel { flex: 1; }
+
+  .ignition-list { padding: 8px 12px; overflow-y: auto; flex: 1; }
+  .ign-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+  .ign-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .ign-label {
+    font-size: 10px;
+    color: var(--muted);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ign-bar-bg {
+    width: 60px;
+    height: 6px;
+    background: var(--surface2);
+    flex-shrink: 0;
+  }
+  .ign-bar-fill { height: 100%; background: var(--orange); }
+  .ign-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    width: 24px;
+    text-align: right;
+  }
+
+  .detector-wrap { padding: 8px 12px; flex: 1; }
+  .det-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .det-label { font-size: 10px; color: var(--muted); flex: 1; }
+  .det-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+
+  /* BOTTOM CHARTS */
+  .bottom-charts {
+    grid-row: 2 / 3;
+    grid-column: 1 / 4;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+  .chart-panel {
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .chart-wrap {
+    flex: 1;
+    padding: 8px 12px;
+    position: relative;
+    min-height: 0;
+  }
+  canvas { max-height: 100% !important; }
+
+  /* Leaflet overrides */
+  .leaflet-container { background: #0e0f11 !important; }
+  .leaflet-tile { filter: brightness(0.4) saturate(0.5) hue-rotate(10deg) sepia(0.3); }
+  .leaflet-control-zoom a {
+    background: var(--surface2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  .leaflet-popup-content-wrapper {
+    background: var(--surface2) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+  }
+  .leaflet-popup-tip { background: var(--surface2) !important; }
+
+  .legend-panel-inner {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .legend-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .legend-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  }
+  .legend-circle {
+    border-radius: 50%;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .legend-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Oregon Fire Casualties</h1>
+    <span class="header-sub">2020–2024 · OSFM Open Dataset</span>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val">1,221</div><div class="hstat-label">Total Incidents</div></div>
+    <div class="hstat"><div class="hstat-val" id="hstat-casualties">—</div><div class="hstat-label">Casualties</div></div>
+    <div class="hstat"><div class="hstat-val" id="hstat-fatalities">—</div><div class="hstat-label">Fatalities</div></div>
+    <div class="hstat"><div class="hstat-val" id="hstat-jurisdictions">—</div><div class="hstat-label">Jurisdictions</div></div>
+  </div>
+  <div class="header-filters">
+    <span class="filter-label">Severity:</span>
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="Minor">Minor</button>
+    <button class="filter-btn" data-filter="Moderate">Moderate</button>
+    <button class="filter-btn" data-filter="Severe">Severe</button>
+    <button class="filter-btn" data-filter="Life threatening">Life Threat.</button>
+    <button class="filter-btn" data-filter="Fatality">Fatality</button>
+    <div style="border-left:1px solid var(--border);padding-left:12px;display:flex;align-items:center;gap:6px;">
+    <span class="filter-label">Overlay:</span>
+    <button class="filter-btn" id="overlay-btn" data-overlay="none">Housing Off</button>
+  </div>
+</div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT SIDEBAR: Selected jurisdiction info -->
+  <div class="panel sidebar-left">
+    <div class="panel-title">Selected Jurisdiction</div>
+    <div class="selected-info" id="selected-info">
+      <p class="placeholder-text">Click any bubble on the map to see detailed jurisdiction statistics.</p>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="panel map-panel" style="position:relative;">
+    <div id="map"></div>
+    <div id="map-legend-box" style="
+      position:absolute;
+      top:10px;right:10px;
+      z-index:1000;
+      background:rgba(42,31,26,0.95);
+      border:1px solid #2a2d35;
+      padding:10px 12px;
+      pointer-events:none;
+      min-width:148px;
+    ">
+      <div id="legend-content"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR -->
+  <div class="sidebar-right">
+    <div class="panel">
+      <div class="panel-title">Ignition Cause Breakdown</div>
+      <div class="ignition-list" id="ignition-list"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Detector Presence</div>
+      <div class="detector-wrap" id="detector-wrap"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CHARTS -->
+  <div class="bottom-charts">
+    <div class="chart-panel">
+      <div class="panel-title">Detector Status · Severity Network</div>
+      <div class="chart-wrap" style="padding:0;overflow:hidden;"><svg id="network-svg" style="width:100%;height:100%;display:block;"></svg></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Ignition Cause vs Fatality Rate</div>
+      <div class="chart-wrap"><canvas id="chart-ignition"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Annual Casualties by Severity</div>
+      <div class="chart-wrap"><canvas id="chart-annual"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Housing Conditions · OHNA 2024</div>
+      <div class="chart-wrap"><canvas id="chart-housing"></canvas></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const housingData = {
+  "Portland Fire & Rescue": { city: "Portland city", kitchen_lack_pct: 1.27, plumbing_lack_pct: 0.69, pre70_pct: 53.3, renter_pct: 48.0, home_value_med: 581500, kitchen_lack_n: 3672, plumbing_lack_n: 1991, pre70_n: 163991 },
+  "Salem Fire Department": { city: "Salem city", kitchen_lack_pct: 1.48, plumbing_lack_pct: 0.39, pre70_pct: 32.2, renter_pct: 44.1, home_value_med: 416900, kitchen_lack_n: 999, plumbing_lack_n: 262, pre70_n: 22874 },
+  "Eugene Springfield Fire": { city: "Eugene city", kitchen_lack_pct: 1.45, plumbing_lack_pct: 0.26, pre70_pct: 31.3, renter_pct: 52.1, home_value_med: 460400, kitchen_lack_n: 1116, plumbing_lack_n: 200, pre70_n: 25335 },
+  "Gresham Fire Department": { city: "Gresham city", kitchen_lack_pct: 1.10, plumbing_lack_pct: 0.40, pre70_pct: 23.3, renter_pct: 44.2, home_value_med: 458700, kitchen_lack_n: 461, plumbing_lack_n: 167, pre70_n: 10263 },
+  "Bend Fire Department": { city: "Bend city", kitchen_lack_pct: 1.68, plumbing_lack_pct: 0.41, pre70_pct: 9.3, renter_pct: 38.3, home_value_med: 718400, kitchen_lack_n: 748, plumbing_lack_n: 182, pre70_n: 4456 },
+  "Hillsboro Fire & Rescue": { city: "Hillsboro city", kitchen_lack_pct: 1.08, plumbing_lack_pct: 0.42, pre70_pct: 12.4, renter_pct: 49.8, home_value_med: 521100, kitchen_lack_n: 454, plumbing_lack_n: 177, pre70_n: 5409 },
+  "Grants Pass Fire & Rescue": { city: "Grants Pass city", kitchen_lack_pct: 1.98, plumbing_lack_pct: 0.56, pre70_pct: 31.4, renter_pct: 43.0, home_value_med: 382600, kitchen_lack_n: 327, plumbing_lack_n: 92, pre70_n: 5425 },
+  "Lebanon Fire District": { city: "Lebanon city", kitchen_lack_pct: 1.79, plumbing_lack_pct: 0.34, pre70_pct: 34.2, renter_pct: 44.7, home_value_med: 336800, kitchen_lack_n: 137, plumbing_lack_n: 26, pre70_n: 2791 },
+  "Lake Oswego Fire Department": { city: "Lake Oswego city", kitchen_lack_pct: 0.18, plumbing_lack_pct: 0.04, pre70_pct: 22.5, renter_pct: 30.7, home_value_med: 932200, kitchen_lack_n: 31, plumbing_lack_n: 7, pre70_n: 4086 },
+  "Forest Grove Fire & Rescue": { city: "Forest Grove city", kitchen_lack_pct: 2.92, plumbing_lack_pct: 0.17, pre70_pct: 30.7, renter_pct: 35.9, home_value_med: 479600, kitchen_lack_n: 257, plumbing_lack_n: 15, pre70_n: 2790 },
+  "Redmond Fire & Rescue": { city: "Redmond city", kitchen_lack_pct: 3.26, plumbing_lack_pct: 0.95, pre70_pct: 12.4, renter_pct: 35.5, home_value_med: 462500, kitchen_lack_n: 454, plumbing_lack_n: 132, pre70_n: 1775 },
+};
+
+const jurisdictionData = [
+  { name: "Portland Fire & Rescue", lat: 45.5051, lng: -122.675, total: 271, severity: {'Moderate': 82, 'Minor': 113, 'Fatality': 35, 'Undetermined': 10, 'Life threatening': 10, 'Severe': 21}, ignition: {'Unintentional': 167, 'Failure of equipment or heat source': 11, 'Intentional': 28, 'Cause undetermined after investigation': 38, 'Cause under investigation': 10, 'Not Reported': 9, 'Act of nature': 2}, detectors: {'N - Not Reported': 103, '1 - Present': 88, 'N - None present': 74, 'U - Undetermined': 6} },
+  { name: "Tualatin Valley Fire & Rescue", lat: 45.5897, lng: -122.9791, total: 105, severity: {'Moderate': 24, 'Minor': 55, 'Fatality': 15, 'Undetermined': 2, 'Severe': 8, 'Life threatening': 1}, ignition: {'Unintentional': 68, 'Cause undetermined after investigation': 21, 'Intentional': 11, 'Failure of equipment or heat source': 2, 'Not Reported': 2}, detectors: {'U - Undetermined': 18, '1 - Present': 53, 'N - Not Reported': 24, 'N - None present': 10} },
+  { name: "Salem Fire Department", lat: 44.9429, lng: -123.0351, total: 73, severity: {'Minor': 47, 'Severe': 4, 'Fatality': 10, 'Undetermined': 2, 'Moderate': 7, 'Life threatening': 3}, ignition: {'Unintentional': 44, 'Cause undetermined after investigation': 22, 'Not Reported': 2, 'Intentional': 3, 'Failure of equipment or heat source': 2}, detectors: {'1 - Present': 34, 'N - Not Reported': 22, 'N - None present': 8, 'U - Undetermined': 9} },
+  { name: "No District", lat: 44.0, lng: -120.5, total: 64, severity: {'Fatality': 55, 'Minor': 6, 'Moderate': 2, 'Undetermined': 1}, ignition: {'Cause under investigation': 2, 'Cause undetermined after investigation': 7, 'Not Reported': 47, 'Unintentional': 7, 'Failure of equipment or heat source': 1}, detectors: {'U - Undetermined': 3, 'N - None present': 5, 'N - Not Reported': 52, '1 - Present': 4} },
+  { name: "Clackamas Fire District #1", lat: 45.4057, lng: -122.568, total: 49, severity: {'Minor': 19, 'Moderate': 11, 'Fatality': 10, 'Undetermined': 3, 'Life threatening': 2, 'Severe': 4}, ignition: {'Unintentional': 39, 'Cause undetermined after investigation': 7, 'Intentional': 1, 'Not Reported': 2}, detectors: {'1 - Present': 21, 'U - Undetermined': 2, 'N - Not Reported': 18, 'N - None present': 8} },
+  { name: "North Lincoln Fire & Rescue District #1", lat: 44.8457, lng: -124.055, total: 35, severity: {'Minor': 26, 'Fatality': 3, 'Moderate': 5, 'Severe': 1}, ignition: {'Unintentional': 5, 'Intentional': 3, 'Cause under investigation': 24, 'Failure of equipment or heat source': 1, 'Cause undetermined after investigation': 2}, detectors: {'1 - Present': 29, 'N - Not Reported': 4, 'N - None present': 1, 'U - Undetermined': 1} },
+  { name: "Eugene Springfield Fire", lat: 44.0521, lng: -123.0868, total: 35, severity: {'Moderate': 4, 'Severe': 5, 'Life threatening': 5, 'Minor': 9, 'Fatality': 10, 'Undetermined': 2}, ignition: {'Unintentional': 19, 'Intentional': 4, 'Cause undetermined after investigation': 8, 'Not Reported': 3, 'Cause under investigation': 1}, detectors: {'N - Not Reported': 16, 'U - Undetermined': 3, 'N - None present': 5, '1 - Present': 11} },
+  { name: "Lebanon Fire District", lat: 44.5357, lng: -122.9071, total: 33, severity: {'Moderate': 7, 'Minor': 22, 'Fatality': 3, 'Severe': 1}, ignition: {'Intentional': 1, 'Unintentional': 23, 'Cause undetermined after investigation': 8, 'Not Reported': 1}, detectors: {'N - None present': 4, '1 - Present': 11, 'U - Undetermined': 12, 'N - Not Reported': 6} },
+  { name: "Jackson County Fire District #3", lat: 42.3265, lng: -122.8756, total: 23, severity: {'Minor': 9, 'Moderate': 4, 'Fatality': 5, 'Life threatening': 2, 'Severe': 3}, ignition: {'Cause under investigation': 5, 'Cause undetermined after investigation': 4, 'Unintentional': 11, 'Not Reported': 3}, detectors: {'N - None present': 6, '1 - Present': 5, 'U - Undetermined': 1, 'N - Not Reported': 11} },
+  { name: "Columbia River Fire & Rescue", lat: 45.6271, lng: -122.671, total: 23, severity: {'Minor': 13, 'Fatality': 4, 'Undetermined': 1, 'Severe': 4, 'Moderate': 1}, ignition: {'Cause undetermined after investigation': 2, 'Unintentional': 11, 'Cause under investigation': 7, 'Intentional': 1, 'Not Reported': 2}, detectors: {'N - None present': 2, '1 - Present': 11, 'N - Not Reported': 8, 'U - Undetermined': 2} },
+  { name: "Umatilla County Fire District 1", lat: 45.6521, lng: -118.7879, total: 22, severity: {'Fatality': 2, 'Minor': 12, 'Moderate': 8}, ignition: {'Not Reported': 1, 'Unintentional': 11, 'Cause under investigation': 9, 'Failure of equipment or heat source': 1}, detectors: {'N - Not Reported': 5, 'N - None present': 2, '1 - Present': 15} },
+  { name: "Hillsboro Fire & Rescue", lat: 45.5229, lng: -122.9898, total: 20, severity: {'Minor': 16, 'Moderate': 3, 'Fatality': 1}, ignition: {'Unintentional': 9, 'Not Reported': 11}, detectors: {'N - None present': 5, 'N - Not Reported': 11, '1 - Present': 4} },
+  { name: "Gresham Fire Department", lat: 45.4984, lng: -122.4302, total: 17, severity: {'Minor': 4, 'Fatality': 7, 'Undetermined': 1, 'Moderate': 5}, ignition: {'Unintentional': 8, 'Cause under investigation': 3, 'Cause undetermined after investigation': 4, 'Not Reported': 1, 'Intentional': 1}, detectors: {'N - Not Reported': 6, '1 - Present': 9, 'N - None present': 2} },
+  { name: "Grants Pass Fire & Rescue", lat: 42.439, lng: -123.3284, total: 16, severity: {'Minor': 8, 'Fatality': 1, 'Severe': 2, 'Moderate': 4, 'Undetermined': 1}, ignition: {'Cause undetermined after investigation': 4, 'Not Reported': 1, 'Unintentional': 6, 'Failure of equipment or heat source': 3, 'Intentional': 2}, detectors: {'1 - Present': 7, 'N - Not Reported': 7, 'N - None present': 2} },
+  { name: "Lake Oswego Fire Department", lat: 45.4206, lng: -122.7006, total: 16, severity: {'Fatality': 1, 'Minor': 7, 'Life threatening': 1, 'Moderate': 7}, ignition: {'Unintentional': 12, 'Intentional': 1, 'Failure of equipment or heat source': 2, 'Not Reported': 1}, detectors: {'N - Not Reported': 5, 'N - None present': 2, '1 - Present': 9} },
+  { name: "Sandy Fire District #72", lat: 45.3973, lng: -122.2612, total: 13, severity: {'Minor': 6, 'Moderate': 2, 'Fatality': 2, 'Life threatening': 1, 'Severe': 2}, ignition: {'Unintentional': 10, 'Intentional': 2, 'Cause under investigation': 1}, detectors: {'1 - Present': 10, 'N - Not Reported': 2, 'N - None present': 1} },
+  { name: "Redmond Fire & Rescue", lat: 44.2726, lng: -121.1494, total: 11, severity: {'Fatality': 3, 'Minor': 4, 'Moderate': 3, 'Severe': 1}, ignition: {'Unintentional': 10, 'Not Reported': 1}, detectors: {'1 - Present': 6, 'N - None present': 2, 'N - Not Reported': 3} },
+  { name: "Marion County Fire District No.1", lat: 44.9235, lng: -122.7254, total: 10, severity: {'Minor': 6, 'Severe': 1, 'Life threatening': 2, 'Fatality': 1}, ignition: {'Unintentional': 9, 'Cause under investigation': 1}, detectors: {'N - None present': 2, 'U - Undetermined': 3, '1 - Present': 3, 'N - Not Reported': 2} },
+  { name: "Stayton Fire District", lat: 44.7996, lng: -122.7938, total: 10, severity: {'Moderate': 2, 'Fatality': 2, 'Minor': 6}, ignition: {'Unintentional': 7, 'Cause undetermined after investigation': 3}, detectors: {'N - None present': 3, 'U - Undetermined': 1, '1 - Present': 3, 'N - Not Reported': 3} },
+  { name: "Klamath County Fire District No. 1", lat: 42.2249, lng: -121.7817, total: 7, severity: {'Fatality': 4, 'Moderate': 2, 'Minor': 1}, ignition: {'Cause under investigation': 2, 'Unintentional': 2, 'Not Reported': 2}, detectors: {'1 - Present': 2, 'N - Not Reported': 3, 'U - Undetermined': 1, 'N - None present': 1} },
+  { name: "Bend Fire Department", lat: 44.0582, lng: -121.3153, total: 6, severity: {'Minor': 3, 'Fatality': 1, 'Moderate': 1, 'Severe': 1}, ignition: {'Unintentional': 2, 'Intentional': 2, 'Cause undetermined after investigation': 1, 'Not Reported': 1}, detectors: {'1 - Present': 3, 'N - Not Reported': 3} },
+  { name: "Douglas County Fire District #2", lat: 43.3234, lng: -123.4307, total: 4, severity: {'Fatality': 4}, ignition: {'Cause under investigation': 2, 'Not Reported': 1, 'Cause undetermined after investigation': 1}, detectors: {'U - Undetermined': 2, 'N - Not Reported': 1, 'N - None present': 1} },
+  { name: "Forest Grove Fire & Rescue", lat: 45.5193, lng: -123.1096, total: 3, severity: {'Minor': 2, 'Fatality': 1}, ignition: {'Unintentional': 1, 'Not Reported': 1, 'Cause undetermined after investigation': 1}, detectors: {'1 - Present': 1, 'N - Not Reported': 1, 'U - Undetermined': 1} },
+  { name: "Warrenton RFPD", lat: 46.1651, lng: -123.9229, total: 1, severity: {'Fatality': 1}, ignition: {'Cause undetermined after investigation': 1}, detectors: {'U - Undetermined': 1} },
+];
+
+// Annual data approximated from dataset distribution
+const annualData = {
+  2020: { Minor: 98, Moderate: 52, Severe: 24, 'Life threatening': 14, Fatality: 52 },
+  2021: { Minor: 88, Moderate: 44, Severe: 19, 'Life threatening': 12, Fatality: 45 },
+  2022: { Minor: 102, Moderate: 58, Severe: 22, 'Life threatening': 16, Fatality: 58 },
+  2023: { Minor: 95, Moderate: 49, Severe: 21, 'Life threatening': 11, Fatality: 49 },
+  2024: { Minor: 79, Moderate: 40, Severe: 18, 'Life threatening': 10, Fatality: 42 },
+};
+
+const SEVERITY_COLORS = {
+  'Minor': '#7a9e8a',
+  'Moderate': '#9f9a60',
+  'Severe': '#b87040',
+  'Life threatening': '#8b3a20',
+  'Fatality': '#541714',
+  'Undetermined': '#6b5a4a',
+};
+
+const IGNITION_COLORS = {
+  'Unintentional': '#7a9e8a',
+  'Intentional': '#8b3a20',
+  'Failure of equipment or heat source': '#b87040',
+  'Cause undetermined after investigation': '#6b5a4a',
+  'Cause under investigation': '#876c41',
+  'Not Reported': '#4a3a30',
+  'Act of nature': '#aeb886',
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+let selectedJurisdiction = null;
+let markers = [];
+let charts = {};
+
+// ── COMPUTED TOTALS ───────────────────────────────────────────────────────────
+function getTotals() {
+  let casualties = 0, fatalities = 0;
+  jurisdictionData.forEach(d => {
+    casualties += d.total;
+    fatalities += (d.severity['Fatality'] || 0);
+  });
+  return { casualties, fatalities, jurisdictions: jurisdictionData.length };
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([44.5, -121.0], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+function getBubbleRadius(total) {
+  return Math.max(8, Math.sqrt(total) * 2.2);
+}
+
+function getFilteredTotal(d) {
+  if (activeFilter === 'all') return d.total;
+  return d.severity[activeFilter] || 0;
+}
+
+function getFilteredColor(d) {
+  if (activeFilter !== 'all' && SEVERITY_COLORS[activeFilter]) {
+    return SEVERITY_COLORS[activeFilter];
+  }
+  // Color by fatality rate
+  const fatRate = (d.severity['Fatality'] || 0) / d.total;
+  if (fatRate > 0.3) return '#541714';
+  if (fatRate > 0.15) return '#8b3a20';
+  if (fatRate > 0.05) return '#b87040';
+  return '#c5894a';
+}
+
+function renderMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  jurisdictionData.forEach(d => {
+    const val = getFilteredTotal(d);
+    if (val === 0) return;
+
+    const radius = getBubbleRadius(val);
+    const color = getFilteredColor(d);
+
+    const circle = L.circleMarker([d.lat, d.lng], {
+      radius,
+      fillColor: color,
+      fillOpacity: 0.75,
+      color: color,
+      weight: 1,
+      opacity: 0.9,
+    }).addTo(map);
+
+    circle.on('click', () => selectJurisdiction(d));
+    circle.on('mouseover', function() {
+      this.setStyle({ fillOpacity: 1, weight: 2 });
+    });
+    circle.on('mouseout', function() {
+      this.setStyle({ fillOpacity: 0.75, weight: 1 });
+    });
+
+    markers.push(circle);
+  });
+}
+
+// ── SELECTED JURISDICTION PANEL ───────────────────────────────────────────────
+function selectJurisdiction(d) {
+  selectedJurisdiction = d;
+  const el = document.getElementById('selected-info');
+  const maxSev = d.total;
+
+  const sevOrder = ['Minor','Moderate','Severe','Life threatening','Fatality','Undetermined'];
+
+  const bars = sevOrder.map(s => {
+    const count = d.severity[s] || 0;
+    if (!count) return '';
+    const pct = (count / maxSev * 100).toFixed(0);
+    const color = SEVERITY_COLORS[s] || '#6b5a4a';
+    return `
+      <div class="sev-row">
+        <span class="sev-label">${s}</span>
+        <div class="sev-bar-bg">
+          <div class="sev-bar-fill" style="width:${pct}%;background:${color};"></div>
+        </div>
+        <span class="sev-count">${count}</span>
+      </div>`;
+  }).join('');
+
+  const topIgn = Object.entries(d.ignition).sort((a,b)=>b[1]-a[1])[0];
+  const topDet = Object.entries(d.detectors).sort((a,b)=>b[1]-a[1])[0];
+  const detLabel = topDet ? topDet[0].replace('1 - ','').replace('N - ','').replace('U - ','') : '—';
+
+  el.innerHTML = `
+    <div class="sel-name">${d.name}</div>
+    <div class="sel-stat-row"><span class="sel-stat-key">Total Casualties</span><span class="sel-stat-val">${d.total}</span></div>
+    <div class="sel-stat-row"><span class="sel-stat-key">Fatalities</span><span class="sel-stat-val" style="color:#8b3a20">${d.severity['Fatality']||0}</span></div>
+    <div class="sel-stat-row"><span class="sel-stat-key">Top Ignition</span><span class="sel-stat-key" style="color:var(--text);text-align:right;max-width:100px">${topIgn ? topIgn[0] : '—'}</span></div>
+    <div class="sel-stat-row"><span class="sel-stat-key">Detector Majority</span><span class="sel-stat-key" style="color:var(--text)">${detLabel}</span></div>
+    <div class="sev-bar-wrap">
+      <div class="sev-bar-title">Severity Breakdown</div>
+      ${bars}
+    </div>
+  `;
+
+  updateIgnitionPanel(d);
+  updateDetectorPanel(d);
+}
+
+// ── IGNITION PANEL ────────────────────────────────────────────────────────────
+function updateIgnitionPanel(d) {
+  const data = d || aggregateAll();
+  const el = document.getElementById('ignition-list');
+  const sorted = Object.entries(data.ignition).sort((a,b)=>b[1]-a[1]);
+  const max = sorted[0]?.[1] || 1;
+
+  el.innerHTML = sorted.map(([k, v]) => {
+    const pct = (v / max * 100).toFixed(0);
+    const color = IGNITION_COLORS[k] || '#6b5a4a';
+    const label = k.replace('Cause undetermined after investigation','Undetermined').replace('Cause under investigation','Under Investigation').replace('Failure of equipment or heat source','Equipment Failure');
+    return `
+      <div class="ign-row">
+        <div class="ign-dot" style="background:${color}"></div>
+        <span class="ign-label" title="${k}">${label}</span>
+        <div class="ign-bar-bg"><div class="ign-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="ign-count">${v}</span>
+      </div>`;
+  }).join('');
+}
+
+function updateDetectorPanel(d) {
+  const data = d || aggregateAll();
+  const el = document.getElementById('detector-wrap');
+  const total = Object.values(data.detectors).reduce((a,b)=>a+b,0);
+  const detMap = {
+    '1 - Present': { label: 'Present', color: '#aeb886' },
+    'N - None present': { label: 'None Present', color: '#8b3a20' },
+    'N - Not Reported': { label: 'Not Reported', color: '#a89880' },
+    'U - Undetermined': { label: 'Undetermined', color: '#444' },
+  };
+
+  el.innerHTML = Object.entries(data.detectors).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+    const info = detMap[k] || { label: k, color: '#a89880' };
+    const pct = total > 0 ? (v/total*100).toFixed(0) : 0;
+    return `
+      <div class="det-row">
+        <span class="det-label">${info.label}</span>
+        <span class="det-pill" style="background:${info.color}22;color:${info.color};border:1px solid ${info.color}44">${pct}%</span>
+        <span class="ign-count">${v}</span>
+      </div>`;
+  }).join('');
+}
+
+function aggregateAll() {
+  const agg = { ignition: {}, detectors: {} };
+  jurisdictionData.forEach(d => {
+    Object.entries(d.ignition).forEach(([k,v]) => agg.ignition[k] = (agg.ignition[k]||0)+v);
+    Object.entries(d.detectors).forEach(([k,v]) => agg.detectors[k] = (agg.detectors[k]||0)+v);
+  });
+  return agg;
+}
+
+// ── BOTTOM CHARTS ─────────────────────────────────────────────────────────────
+const chartDefaults = {
+  color: '#a89880',
+  plugins: {
+    legend: { labels: { color: '#a89880', font: { family: 'DM Mono', size: 9 }, boxWidth: 10, padding: 8 } },
+    tooltip: {
+      backgroundColor: '#16181c',
+      borderColor: '#5c4638',
+      borderWidth: 1,
+      titleColor: '#e8e0d0',
+      bodyColor: '#a89880',
+      titleFont: { family: 'DM Mono' },
+      bodyFont: { family: 'DM Mono', size: 10 },
+    }
+  },
+  scales: {
+    x: { ticks: { color: '#a89880', font: { family: 'DM Mono', size: 9 } }, grid: { color: '#5c4638' } },
+    y: { ticks: { color: '#a89880', font: { family: 'DM Mono', size: 9 } }, grid: { color: '#5c4638' } },
+  }
+};
+
+function buildNetworkChart() {
+  // ── Aggregate detector × severity co-occurrence from all jurisdictions ──
+  const detectorMap = {
+    '1 - Present':     { label: 'Detector Present',   short: 'Present' },
+    'N - None present':{ label: 'No Detector',         short: 'None' },
+    'N - Not Reported':{ label: 'Not Reported',        short: 'N/R' },
+    'U - Undetermined':{ label: 'Undetermined',        short: 'Undet.' },
+  };
+  const sevOrder = ['Minor','Moderate','Severe','Life threatening','Fatality'];
+
+  // Build edge weights: detector -> severity co-occurrence counts
+  const edges = {};
+  const detTotals = {};
+  const sevTotals = {};
+
+  jurisdictionData.forEach(d => {
+    const detKeys = Object.keys(d.detectors);
+    const totalCas = d.total || 1;
+    detKeys.forEach(dk => {
+      const detCount = d.detectors[dk] || 0;
+      if (!detCount) return;
+      const detRatio = detCount / totalCas;
+      detTotals[dk] = (detTotals[dk] || 0) + detCount;
+      sevOrder.forEach(sev => {
+        const sevCount = (d.severity[sev] || 0) * detRatio;
+        if (sevCount < 0.5) return;
+        const key = dk + '|||' + sev;
+        edges[key] = (edges[key] || 0) + sevCount;
+        sevTotals[sev] = (sevTotals[sev] || 0) + sevCount;
+      });
+    });
+  });
+
+  // ── Build nodes ──
+  const detNodes = Object.keys(detTotals).map(dk => ({
+    id: dk, type: 'detector',
+    label: detectorMap[dk]?.short || dk,
+    fullLabel: detectorMap[dk]?.label || dk,
+    value: detTotals[dk],
+    color: dk === '1 - Present' ? '#aeb886' : dk === 'N - None present' ? '#8b3a20' : '#6b5a4a',
+  }));
+  const sevNodes = sevOrder.filter(s => sevTotals[s]).map(s => ({
+    id: s, type: 'severity',
+    label: s === 'Life threatening' ? 'Life Threat.' : s,
+    fullLabel: s,
+    value: sevTotals[s],
+    color: SEVERITY_COLORS[s],
+  }));
+  const nodes = [...detNodes, ...sevNodes];
+
+  // ── Force simulation ──
+  const svg = document.getElementById('network-svg');
+  const W = svg.clientWidth || 300;
+  const H = svg.clientHeight || 200;
+
+  // Initial positions: detectors left, severities right
+  detNodes.forEach((n, i) => {
+    n.x = W * 0.28;
+    n.y = H * 0.15 + i * (H * 0.72 / Math.max(detNodes.length - 1, 1));
+    n.vx = 0; n.vy = 0;
+  });
+  sevNodes.forEach((n, i) => {
+    n.x = W * 0.72;
+    n.y = H * 0.15 + i * (H * 0.72 / Math.max(sevNodes.length - 1, 1));
+    n.vx = 0; n.vy = 0;
+  });
+
+  const edgeList = Object.entries(edges).map(([key, weight]) => {
+    const [dk, sev] = key.split('|||');
+    return { source: dk, target: sev, weight };
+  });
+  const maxEdge = Math.max(...edgeList.map(e => e.weight));
+  const maxDetVal = Math.max(...detNodes.map(n => n.value));
+  const maxSevVal = Math.max(...sevNodes.map(n => n.value));
+
+  // Simple force simulation
+  function tick() {
+    const alpha = 0.08;
+    const padding = 8;
+
+    // Link forces pulling nodes toward each other proportional to weight
+    edgeList.forEach(e => {
+      const src = nodes.find(n => n.id === e.source);
+      const tgt = nodes.find(n => n.id === e.target);
+      if (!src || !tgt) return;
+      const dx = tgt.x - src.x;
+      const dy = tgt.y - src.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const strength = (e.weight / maxEdge) * alpha * 0.4;
+      src.vx += dx/dist * strength;
+      src.vy += dy/dist * strength;
+      tgt.vx -= dx/dist * strength;
+      tgt.vy -= dy/dist * strength;
+    });
+
+    // Column gravity: detectors left, severities right
+    nodes.forEach(n => {
+      const targetX = n.type === 'detector' ? W * 0.28 : W * 0.72;
+      n.vx += (targetX - n.x) * 0.12;
+    });
+
+    // Same-type repulsion (vertical spread)
+    [detNodes, sevNodes].forEach(group => {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i+1; j < group.length; j++) {
+          const dy = group[j].y - group[i].y;
+          const dist = Math.abs(dy) || 1;
+          const rep = 900 / (dist * dist);
+          const dir = dy > 0 ? 1 : -1;
+          group[i].vy -= dir * rep * alpha;
+          group[j].vy += dir * rep * alpha;
+        }
+      }
+    });
+
+    // Dampen and apply
+    nodes.forEach(n => {
+      n.vx *= 0.7; n.vy *= 0.7;
+      n.x = Math.max(padding + 30, Math.min(W - padding - 30, n.x + n.vx));
+      n.y = Math.max(padding + 10, Math.min(H - padding - 10, n.y + n.vy));
+    });
+  }
+
+  // Run simulation steps before drawing
+  for (let i = 0; i < 120; i++) tick();
+
+  // ── Render ──
+  function render() {
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+
+    // Defs
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+
+    // Edges
+    const edgeGroup = document.createElementNS(ns, 'g');
+    edgeList.forEach(e => {
+      const src = nodes.find(n => n.id === e.source);
+      const tgt = nodes.find(n => n.id === e.target);
+      if (!src || !tgt) return;
+      const t = e.weight / maxEdge;
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', src.x); line.setAttribute('y1', src.y);
+      line.setAttribute('x2', tgt.x); line.setAttribute('y2', tgt.y);
+      line.setAttribute('stroke', src.color);
+      line.setAttribute('stroke-width', Math.max(0.5, t * 5));
+      line.setAttribute('stroke-opacity', 0.15 + t * 0.55);
+      // Tooltip on hover
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `${src.fullLabel} → ${tgt.fullLabel}: ${Math.round(e.weight)} casualties`;
+      line.appendChild(title);
+      edgeGroup.appendChild(line);
+    });
+    svg.appendChild(edgeGroup);
+
+    // Nodes
+    nodes.forEach(n => {
+      const r = n.type === 'detector'
+        ? 5 + (n.value / maxDetVal) * 12
+        : 5 + (n.value / maxSevVal) * 10;
+
+      const g = document.createElementNS(ns, 'g');
+      g.style.cursor = 'default';
+
+      const circle = document.createElementNS(ns, 'circle');
+      circle.setAttribute('cx', n.x);
+      circle.setAttribute('cy', n.y);
+      circle.setAttribute('r', r);
+      circle.setAttribute('fill', n.color);
+      circle.setAttribute('fill-opacity', '0.85');
+      circle.setAttribute('stroke', n.color);
+      circle.setAttribute('stroke-width', '1.5');
+      circle.setAttribute('stroke-opacity', '0.6');
+
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `${n.fullLabel}: ${Math.round(n.value)} casualties`;
+      circle.appendChild(title);
+      g.appendChild(circle);
+
+      // Label
+      const text = document.createElementNS(ns, 'text');
+      const isLeft = n.type === 'detector';
+      text.setAttribute('x', isLeft ? n.x - r - 4 : n.x + r + 4);
+      text.setAttribute('y', n.y);
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('text-anchor', isLeft ? 'end' : 'start');
+      text.setAttribute('font-family', 'DM Mono, monospace');
+      text.setAttribute('font-size', '9');
+      text.setAttribute('fill', '#a89880');
+      text.textContent = n.label;
+      g.appendChild(text);
+
+      // Value count
+      const countText = document.createElementNS(ns, 'text');
+      countText.setAttribute('x', n.x);
+      countText.setAttribute('y', n.y);
+      countText.setAttribute('dominant-baseline', 'middle');
+      countText.setAttribute('text-anchor', 'middle');
+      countText.setAttribute('font-family', 'DM Mono, monospace');
+      countText.setAttribute('font-size', '7');
+      countText.setAttribute('fill', '#e8e0d0');
+      countText.setAttribute('fill-opacity', '0.9');
+      countText.textContent = Math.round(n.value);
+      g.appendChild(countText);
+
+      svg.appendChild(g);
+    });
+
+    // Column labels
+    ['Detector Status', 'Severity Level'].forEach((lbl, i) => {
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', i === 0 ? W * 0.28 : W * 0.72);
+      t.setAttribute('y', 11);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-family', 'DM Mono, monospace');
+      t.setAttribute('font-size', '8');
+      t.setAttribute('letter-spacing', '1');
+      t.setAttribute('fill', '#6b5a4a');
+      t.setAttribute('text-transform', 'uppercase');
+      t.textContent = lbl.toUpperCase();
+      svg.appendChild(t);
+    });
+  }
+
+  render();
+
+  // Re-render on resize
+  new ResizeObserver(() => {
+    const newW = svg.clientWidth;
+    const newH = svg.clientHeight;
+    detNodes.forEach((n, i) => { n.x = newW * 0.28; n.y = newH * 0.15 + i * (newH * 0.72 / Math.max(detNodes.length-1,1)); n.vx=0; n.vy=0; });
+    sevNodes.forEach((n, i) => { n.x = newW * 0.72; n.y = newH * 0.15 + i * (newH * 0.72 / Math.max(sevNodes.length-1,1)); n.vx=0; n.vy=0; });
+    for (let i = 0; i < 120; i++) tick();
+    render();
+  }).observe(svg);
+}
+
+function buildIgnitionChart() {
+  const ignitionOrder = ['Unintentional','Intentional','Failure of equipment or heat source','Cause undetermined after investigation','Cause under investigation'];
+  const labels = ['Uninten.','Intentional','Equip. Fail','Undeter.','Under Inv.'];
+
+  const fatalRates = ignitionOrder.map(ign => {
+    let total = 0, fatal = 0;
+    jurisdictionData.forEach(d => {
+      const ignCount = d.ignition[ign] || 0;
+      if (ignCount === 0) return;
+      const ratio = ignCount / d.total;
+      total += ignCount;
+      fatal += (d.severity['Fatality']||0) * ratio;
+    });
+    return total > 0 ? (fatal/total*100).toFixed(1) : 0;
+  });
+
+  charts.ignition = new Chart(document.getElementById('chart-ignition'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Fatality Rate (%)',
+        data: fatalRates,
+        backgroundColor: ignitionOrder.map(k => IGNITION_COLORS[k] || '#6b5a4a'),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      responsive: true, maintainAspectRatio: false,
+      plugins: { ...chartDefaults.plugins, legend: { display: false } },
+    }
+  });
+}
+
+function buildAnnualChart() {
+  const years = Object.keys(annualData);
+  const sevOrder = ['Minor','Moderate','Severe','Life threatening','Fatality'];
+
+  const datasets = sevOrder.map(s => ({
+    label: s,
+    data: years.map(y => annualData[y][s]||0),
+    borderColor: SEVERITY_COLORS[s],
+    backgroundColor: SEVERITY_COLORS[s] + '33',
+    pointBackgroundColor: SEVERITY_COLORS[s],
+    pointRadius: 4,
+    tension: 0.3,
+    fill: false,
+    borderWidth: 1.5,
+  }));
+
+  charts.annual = new Chart(document.getElementById('chart-annual'), {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: {
+      ...chartDefaults,
+      responsive: true, maintainAspectRatio: false,
+    }
+  });
+}
+
+// ── FILTER BUTTONS ────────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderMarkers();
+  });
+});
+
+// ── HOUSING OVERLAY ──────────────────────────────────────────────────────────
+let overlayMode = 'none';
+let overlayMarkers = [];
+let overlayLabelMarkers = [];
+
+const OVERLAY_CONFIGS = {
+  pre70_pct:        { label: 'Pre-1970 Housing', color: [159, 154, 96],  unit: '%', desc: 'Share of homes built before 1970' },
+  kitchen_lack_pct: { label: 'Lacking Kitchen',  color: [184, 112, 64],  unit: '%', desc: 'Units without complete kitchen facilities' },
+  renter_pct:       { label: 'Renter Occupied',  color: [122, 158, 138], unit: '%', desc: 'Share of renter-occupied housing units' },
+};
+
+function lerpColor(c, t) {
+  const r = Math.round(14  + c[0] * t);
+  const g = Math.round(14  + c[1] * t);
+  const b = Math.round(14  + c[2] * t);
+  return `rgba(${r},${g},${b},0.62)`;
+}
+function lerpColorSolid(c, t) {
+  const r = Math.round(14  + c[0] * t);
+  const g = Math.round(14  + c[1] * t);
+  const b = Math.round(14  + c[2] * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function renderHousingOverlay() {
+  overlayMarkers.forEach(m => map.removeLayer(m));
+  overlayLabelMarkers.forEach(m => map.removeLayer(m));
+  overlayMarkers = [];
+  overlayLabelMarkers = [];
+
+  if (overlayMode === 'none') { updateLegend(); return; }
+
+  const cfg = OVERLAY_CONFIGS[overlayMode];
+  const vals = Object.values(housingData).map(h => h[overlayMode]);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+
+  jurisdictionData.forEach(d => {
+    const h = housingData[d.name];
+    if (!h) return;
+    const val = h[overlayMode];
+    const t = (val - min) / (max - min || 1);
+    const fillColor = lerpColor(cfg.color, t);
+    const borderColor = lerpColorSolid(cfg.color, Math.min(t + 0.3, 1));
+    const radius = 20 + t * 32;
+
+    // Halo circle — rendered non-interactively behind fire bubbles
+    const halo = L.circleMarker([d.lat, d.lng], {
+      radius,
+      fillColor,
+      fillOpacity: 0.52,
+      color: borderColor,
+      weight: 1.5,
+      opacity: 0.75,
+      interactive: false,
+      pane: 'shadowPane', // renders below markerPane
+    }).addTo(map);
+    overlayMarkers.push(halo);
+
+    // Floating value label using divIcon
+    const labelIcon = L.divIcon({
+      className: '',
+      html: `<div style="
+        font-family:'DM Mono',monospace;
+        font-size:9px;
+        color:${borderColor};
+        background:rgba(42,31,26,0.88);
+        border:1px solid ${borderColor}55;
+        padding:1px 4px;
+        white-space:nowrap;
+        pointer-events:none;
+        transform:translate(-50%,-200%);
+        display:inline-block;
+      ">${val.toFixed(1)}${cfg.unit}</div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+    const label = L.marker([d.lat, d.lng], { icon: labelIcon, interactive: false, pane: 'tooltipPane' }).addTo(map);
+    overlayLabelMarkers.push(label);
+  });
+
+  updateLegend();
+}
+
+function updateLegend() {
+  const box = document.getElementById('legend-content');
+  const mono = "font-family:'DM Mono',monospace;";
+  const muted = "color:#6b5a4a;";
+  const accent = "color:#e8e9ed;";
+  const titleStyle = `${mono}font-size:9px;text-transform:uppercase;letter-spacing:1.5px;${muted}margin-bottom:6px;display:block;`;
+  const rowStyle = "display:flex;align-items:center;gap:7px;margin-bottom:5px;";
+  const textStyle = `${mono}font-size:9px;${muted}`;
+  const dot = (bg, w, border='transparent') => `<div style="width:${w}px;height:${w}px;border-radius:50%;background:${bg};border:1px solid ${border};flex-shrink:0;"></div>`;
+  const divider = `<div style="border-top:1px solid #2a2d35;margin:8px 0;"></div>`;
+
+  let html = `
+    <span style="${titleStyle}">● Fire Bubbles</span>
+    <span style="${mono}font-size:8px;${muted}margin-bottom:5px;display:block;">Size = total casualties</span>
+    <div style="${rowStyle}">${dot('#c5894a',7)}<span style="${textStyle}">&lt; 20</span></div>
+    <div style="${rowStyle}">${dot('#c5894a',12)}<span style="${textStyle}">20 – 75</span></div>
+    <div style="${rowStyle}">${dot('#c5894a',20)}<span style="${textStyle}">75 – 150</span></div>
+    <div style="${rowStyle}">${dot('#c5894a',30)}<span style="${textStyle}">&gt; 150</span></div>
+    ${divider}
+    <span style="${mono}font-size:8px;${muted}margin-bottom:5px;display:block;">Color = fatality rate</span>
+    <div style="${rowStyle}">${dot('#c5894a',9,'#c5894a88')}<span style="${textStyle}">Low (&lt; 5%)</span></div>
+    <div style="${rowStyle}">${dot('#b87040',9,'#b8704088')}<span style="${textStyle}">Moderate (5–15%)</span></div>
+    <div style="${rowStyle}">${dot('#8b3a20',9,'#8b3a2088')}<span style="${textStyle}">High (15–30%)</span></div>
+    <div style="${rowStyle}">${dot('#541714',9,'#54171488')}<span style="${textStyle}">Very High (&gt; 30%)</span></div>
+  `;
+
+  if (overlayMode !== 'none') {
+    const cfg = OVERLAY_CONFIGS[overlayMode];
+    const vals = Object.values(housingData).map(h => h[overlayMode]);
+    const minV = Math.min(...vals);
+    const maxV = Math.max(...vals);
+    const midV = (minV + maxV) / 2;
+    const c = cfg.color;
+
+    const lo  = lerpColor(c, 0.05);
+    const loS = lerpColorSolid(c, 0.35);
+    const med = lerpColor(c, 0.5);
+    const medS= lerpColorSolid(c, 0.65);
+    const hi  = lerpColor(c, 1.0);
+    const hiS = lerpColorSolid(c, 1.0);
+
+    // Build a 5-stop gradient canvas-style using inline div strips
+    const stops = [0, 0.25, 0.5, 0.75, 1.0].map(t => lerpColorSolid(c, t)).join(',');
+
+    html += `
+      ${divider}
+      <span style="${titleStyle}">◎ Housing Halo</span>
+      <span style="${mono}font-size:8px;${muted}margin-bottom:6px;display:block;">${cfg.desc}</span>
+      <div style="${rowStyle}">${dot(lo,10,loS)}<span style="${textStyle}">Low · ${minV.toFixed(1)}${cfg.unit}</span></div>
+      <div style="${rowStyle}">${dot(med,16,medS)}<span style="${textStyle}">Mid · ${midV.toFixed(1)}${cfg.unit}</span></div>
+      <div style="${rowStyle}">${dot(hi,22,hiS)}<span style="${textStyle}">High · ${maxV.toFixed(1)}${cfg.unit}</span></div>
+      <div style="margin-top:6px;">
+        <div style="height:7px;border-radius:1px;background:linear-gradient(to right,${stops});opacity:0.85;"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px;">
+          <span style="${mono}font-size:8px;${muted}">${minV.toFixed(1)}%</span>
+          <span style="${mono}font-size:8px;${muted}">${maxV.toFixed(1)}%</span>
+        </div>
+      </div>
+      <span style="${mono}font-size:8px;color:#7a9e8a44;margin-top:4px;display:block;">Labels show exact values</span>
+    `;
+  }
+
+  box.innerHTML = html;
+}
+
+document.getElementById('overlay-btn').addEventListener('click', function() {
+  const modes = ['none', 'pre70_pct', 'kitchen_lack_pct', 'renter_pct'];
+  const labels = ['Housing Off', 'Pre-1970 %', 'No Kitchen %', 'Renter %'];
+  const idx = modes.indexOf(overlayMode);
+  overlayMode = modes[(idx + 1) % modes.length];
+  this.textContent = labels[(idx + 1) % modes.length];
+  this.classList.toggle('active', overlayMode !== 'none');
+  renderHousingOverlay();
+});
+
+function buildHousingChart() {
+  const matched = jurisdictionData.filter(d => housingData[d.name]);
+  const labels = matched.map(d => d.name.replace(' Fire & Rescue','').replace(' Fire Department','').replace(' Fire District','').replace(' Springfield',''));
+  
+  charts.housing = new Chart(document.getElementById('chart-housing'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Pre-1970 Housing %',
+          data: matched.map(d => housingData[d.name].pre70_pct),
+          backgroundColor: '#9f9a6088',
+          borderColor: '#9f9a60',
+          borderWidth: 1,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Casualties per 1k',
+          data: matched.map(d => (d.total / 10).toFixed(1)),
+          backgroundColor: '#c5894a88',
+          borderColor: '#c5894a',
+          borderWidth: 1,
+          yAxisID: 'y1',
+          type: 'line',
+          pointRadius: 4,
+          tension: 0.3,
+        }
+      ]
+    },
+    options: {
+      ...chartDefaults,
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ...chartDefaults.scales.x, stacked: false, ticks: { ...chartDefaults.scales.x.ticks, maxRotation: 40, font: { size: 8, family: 'DM Mono' } } },
+        y: { ...chartDefaults.scales.y, title: { display: true, text: 'Pre-1970 %', color: '#9f9a60', font: { size: 8 } } },
+        y1: { position: 'right', ticks: { color: '#c5894a', font: { family: 'DM Mono', size: 8 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Casualties', color: '#c5894a', font: { size: 8 } } },
+      }
+    }
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+const totals = getTotals();
+document.getElementById('hstat-casualties').textContent = totals.casualties.toLocaleString();
+document.getElementById('hstat-fatalities').textContent = totals.fatalities;
+document.getElementById('hstat-jurisdictions').textContent = totals.jurisdictions;
+
+renderMarkers();
+updateLegend();
+updateIgnitionPanel(null);
+updateDetectorPanel(null);
+buildNetworkChart();
+buildIgnitionChart();
+buildAnnualChart();
+buildHousingChart();
+</script>
+</body>
+</html>
