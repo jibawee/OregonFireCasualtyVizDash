@@ -4,7 +4,7 @@
 
 **Live site:** https://jibawee.github.io/OregonFireCasualtyVizDash/
 
-An interactive dashboard comparing Oregon fire casualty data (2020–2024) with housing conditions data.
+An interactive dashboard comparing Oregon fire casualty data (2020–2024) with housing condition data.
 
 **Data Sources**
 - Casualty data: [Oregon State Fire Marshal Fire Casualties Open Dataset](https://www.oregon.gov/osfm/about-us/pages/geographic-information-system-maps.aspx)
